@@ -1,0 +1,24 @@
+{
+  "name": "sdc-cli",
+  "version": "1.0.0",
+  "description": "A useful CLI in Node.js to use simple-data-crypto library",
+  "keywords": [
+    "encryption",
+    "decryption",
+    "cli",
+    "back-end"
+  ],
+  "bin": "./cli.js",
+  "license": "MIT",
+  "author": "chcs1013",
+  "type": "module",
+  "main": "cli.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "commander": "^14.0.2",
+    "inquirer": "^13.0.1",
+    "simple-data-crypto": "^1.56.11"
+  }
+}
