@@ -227,7 +227,7 @@ class CryptCLI {
                 // File encryption
                 const fileReader = await this.createFileReader(inputFile);
                 const fileWriter = await this.createFileWriter(outputFile || '-');
-                if (inputFile === '-' && (!options.passwordScript)) options.passwordScript = fileURLToPath(import.meta.url) + '/../askpass.js';
+                if (inputFile === '-' && (!options.passwordScript)) options.passwordScript = 'sdc-askpass';
                 const password = await this.getPassword(options, 'password');
 
                 const success = await encrypt_file(fileReader, fileWriter, password);
@@ -274,7 +274,7 @@ class CryptCLI {
                 // File decryption
                 const fileReader = await this.createFileReader(inputFile);
                 const fileWriter = await this.createFileWriter(outputFile || '-');
-                if (inputFile === '-' && (!options.passwordScript)) options.passwordScript = fileURLToPath(import.meta.url) + '/../askpass.js';
+                if (inputFile === '-' && (!options.passwordScript)) options.passwordScript = 'sdc-askpass';
                 const password = await this.getPassword(options, 'password');
                 
                 const success = await decrypt_file(fileReader, fileWriter, password);
@@ -321,7 +321,7 @@ class CryptCLI {
             } else {
                 fileBuffer = await fs.readFile(inputFile);
             }
-            if (inputFile === '-' && (!options.passwordScript)) options.passwordScript = fileURLToPath(import.meta.url) + '/../askpass.js';
+            if (inputFile === '-' && (!options.passwordScript)) options.passwordScript = 'sdc-askpass';
 
             // Take first 5KB or entire file if smaller
             const headerSize = Math.min(5 * 1024, fileBuffer.length);
