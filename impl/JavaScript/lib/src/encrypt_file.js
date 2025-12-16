@@ -21,8 +21,8 @@ const crypto = globalThis.crypto; // To avoid the possible security risk
 
 /**
  * 加密文件
- * @param {(start: number, end: number) => Promise<Uint8Array>} file_reader - 文件读取器对象，需要实现(start: number, end: number) => Promise<Uint8Array>
- * @param {(data: Uint8Array) => Promise<void>} file_writer - 文件写入器对象，需要实现write(Uint8Array)方法
+ * @param {(start: number, end: number) => Promise<Uint8Array<ArrayBuffer>>} file_reader - 文件读取器对象，需要实现(start: number, end: number) => Promise<Uint8Array<ArrayBuffer>>
+ * @param {(data: Uint8Array<ArrayBuffer>) => Promise<void>} file_writer - 文件写入器对象，需要实现write(Uint8Array<ArrayBuffer>)方法
  * @param {string} user_key - 用户密钥
  * @param {((processed_bytes: number) => void)|null} callback - 可选回调函数，用于报告加密进度
  * @param {string|null} phrase - 可选短语，用于密钥派生
@@ -183,8 +183,8 @@ export async function encrypt_file(file_reader, file_writer, user_key, callback 
 /**
  * 解密文件（1.1）
  * @deprecated 仅供兼容1.1版本使用。
- * @param {(start: number, end: number) => Promise<Uint8Array>} file_reader - 文件读取器对象，需要实现(start: number, end: number) => Promise<Uint8Array>
- * @param {Function} file_writer - 文件写入器对象，需要实现write(Uint8Array)方法
+ * @param {(start: number, end: number) => Promise<Uint8Array<ArrayBuffer>>} file_reader - 文件读取器对象，需要实现(start: number, end: number) => Promise<Uint8Array<ArrayBuffer>>
+ * @param {Function} file_writer - 文件写入器对象，需要实现write(Uint8Array<ArrayBuffer>)方法
  * @param {((decrypted_bytes: number, processed_bytes: number) => void)|((decrypted_bytes: number) => void)|null} callback - 可选回调函数，用于报告加密进度
  * @param {string} user_key - 用户提供的解密密钥
  * @param {Function} [callback=null] - 进度回调函数
@@ -291,9 +291,9 @@ export async function decrypt_file_V_1_1_0(file_reader, file_writer, user_key, c
 }
 /**
  * 解密文件
- * @param {(start: number, end: number) => Promise<Uint8Array>} file_reader - 文件读取器对象，需要实现(start: number, end: number) => Promise<Uint8Array>
- * @param {(data: Uint8Array) => Promise<void>} file_writer - 文件写入器对象，需要实现write(Uint8Array)方法
- * @param {string|Uint8Array} user_key - 用户提供的解密密钥（字符串）或者派生后的密钥（Uint8Array）
+ * @param {(start: number, end: number) => Promise<Uint8Array<ArrayBuffer>>} file_reader - 文件读取器对象，需要实现(start: number, end: number) => Promise<Uint8Array<ArrayBuffer>>
+ * @param {(data: Uint8Array<ArrayBuffer>) => Promise<void>} file_writer - 文件写入器对象，需要实现write(Uint8Array<ArrayBuffer>)方法
+ * @param {string|Uint8Array<ArrayBuffer>} user_key - 用户提供的解密密钥（字符串）或者派生后的密钥（Uint8Array<ArrayBuffer>）
  * @param {((decrypted_bytes: number, processed_bytes: number) => void)|((decrypted_bytes: number) => void)|null} callback - 可选回调函数，用于报告加密进度
  * @returns {Promise<boolean>} 返回解密是否成功
  */
@@ -467,13 +467,13 @@ export async function encrypt_blob(blob, password, callback, phrase, N, chunk_si
     if (!(blob instanceof Blob)) throw new Exceptions.InvalidParameterException("blob must be a Blob");
     const buffer = [];
     const file_reader = async (/** @type {number} */ start, /** @type {number} */ end) => new Uint8Array(await (blob.slice(start, end).arrayBuffer()));
-    const file_writer = async (/** @type {Uint8Array} */ data) => { buffer.push(data) };
+    const file_writer = async (/** @type {Uint8Array<ArrayBuffer>} */ data) => { buffer.push(data) };
     if (!await encrypt_file(file_reader, file_writer, password, callback, phrase, N, chunk_size)) throw new Exceptions.UnexpectedError();
     return new Blob(buffer);
 }
 /**
  * @param {Blob} blob
- * @param {string | Uint8Array} password
+ * @param {string | Uint8Array<ArrayBuffer>} password
  * @param {((decrypted_bytes: number, processed_bytes: number) => void)|((decrypted_bytes: number) => void)|null} callback - 可选回调函数，用于报告加密进度
  * @returns {Promise<Blob>}
  */

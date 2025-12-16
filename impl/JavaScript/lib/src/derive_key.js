@@ -49,7 +49,7 @@ export async function derive_key(key, iv, phrase = null, N = null, salt = null, 
     // 使用Scrypt进行密钥派生(pycryptodome没有PBKDF2HMAC，使用Scrypt作为替代)
     // AES-256需要32字节密钥
     /**
-     * @type {Uint8Array}
+     * @type {Uint8Array<ArrayBuffer>}
      */
     const derived_key = await scrypt(str_encode(keyInput), salt, N, r, p, dklen)
 

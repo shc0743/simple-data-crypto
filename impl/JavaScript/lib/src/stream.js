@@ -12,12 +12,12 @@ const crypto = globalThis.crypto; // To avoid the possible security risk
 
 
 export class InputStream {
-    /** @type {((start: number, end: number, signal?: AbortSignal) => Promise<Uint8Array>) | null} */
+    /** @type {((start: number, end: number, signal?: AbortSignal) => Promise<Uint8Array<ArrayBuffer>>) | null} */
     #reader;
     #cache = {
         position: 0,
         end: 0,
-        /** @type {?Uint8Array} */ data: null,
+        /** @type {?Uint8Array<ArrayBuffer>} */ data: null,
     };
     #size;
     get [Symbol.toStringTag]() {
@@ -25,7 +25,7 @@ export class InputStream {
     }
 
     /**
-     * @param {(start: number, end: number, signal?: AbortSignal) => Promise<Uint8Array>} reader The reader function
+     * @param {(start: number, end: number, signal?: AbortSignal) => Promise<Uint8Array<ArrayBuffer>>} reader The reader function
      * @param {number} size The size of the stream
      */
     constructor(reader, size) {
@@ -48,7 +48,7 @@ export class InputStream {
      * @param {Number} end end pos
      * @param {Number|null} suggestion_end The suggested end. Used for caching.
      * @param {AbortController|null} abort The abort controller. Used for aborting the read.
-     * @returns {Promise<Uint8Array>}
+     * @returns {Promise<Uint8Array<ArrayBuffer>>}
      */
     async read(start, end, suggestion_end = null, abort = null) {
         if (!this.#reader) throw new Error('Stream: The stream has been closed.');

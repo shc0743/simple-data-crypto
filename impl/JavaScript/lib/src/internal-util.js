@@ -157,3 +157,15 @@ export async function is_encrypted_file(file_reader) {
         return false; 
     }
 }
+
+/**
+ * Ensures that the Uint8Array's buffer is safe to use.
+ * @param {Uint8Array} data 
+ * @returns {Uint8Array}
+ */
+export function toSafeUint8Array(data) {
+    if (data.buffer instanceof SharedArrayBuffer) 
+        return new Uint8Array(data.slice());
+    else
+        return data;
+}

@@ -110,7 +110,7 @@ export async function parse_ciphertext(message_encrypted) {
 
 /**
  * @param {string} message_encrypted
- * @param {string|Uint8Array} key
+ * @param {string|Uint8Array<ArrayBuffer>} key
  */
 export async function decrypt_data(message_encrypted, key) {
     const { iv, ciphertext, tag, phrase, salt, N } = await parse_ciphertext(message_encrypted);

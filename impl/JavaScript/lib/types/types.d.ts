@@ -4,15 +4,15 @@ import * as Wrappers from './util-wrappers';
 declare module "simple-data-crypto" {
     export function derive_key(
         key: string,
-        iv: Uint8Array,
+        iv: Uint8Array<ArrayBuffer>,
         phrase?: string | null,
         N?: number | null,
-        salt?: Uint8Array | null,
+        salt?: Uint8Array<ArrayBuffer> | null,
         r?: number,
         p?: number,
         dklen?: number
     ): Promise<{
-        derived_key: Uint8Array;
+        derived_key: Uint8Array<ArrayBuffer>;
         parameter: string;
         N: number;
     }> & {
@@ -21,14 +21,14 @@ declare module "simple-data-crypto" {
         | Exceptions.InvalidParameterException;
     };
     export function scrypt(
-        key: Uint8Array,
-        salt: Uint8Array,
+        key: Uint8Array<ArrayBuffer>,
+        salt: Uint8Array<ArrayBuffer>,
         N: number,
         r: number,
         p: number,
         dklen: number,
         onprogress?: (progress: number) => void
-    ): Promise<Uint8Array>;
+    ): Promise<Uint8Array<ArrayBuffer>>;
     export function scrypt_hex(
         key: string,
         salt: string,
@@ -38,11 +38,11 @@ declare module "simple-data-crypto" {
         dklen: number,
         onprogress?: (progress: number) => void
     ): Promise<string>;
-    export function hexlify(data: Uint8Array): string & { throws: | TypeError };
-    export function unhexlify(hexStr: string): Uint8Array & { throws: | TypeError };
-    export function str_encode(input: string, encoding: 'utf-8'): Uint8Array & { throws: | TypeError | Error };
-    export function str_decode(input: Uint8Array | ArrayBuffer, encoding: 'utf-8'): string & { throws: | Error };
-    export function get_random_bytes(count: number): Uint8Array;
+    export function hexlify(data: Uint8Array<ArrayBuffer>): string & { throws: | TypeError };
+    export function unhexlify(hexStr: string): Uint8Array<ArrayBuffer> & { throws: | TypeError };
+    export function str_encode(input: string, encoding: 'utf-8'): Uint8Array<ArrayBuffer> & { throws: | TypeError | Error };
+    export function str_decode(input: Uint8Array<ArrayBuffer> | ArrayBuffer, encoding: 'utf-8'): string & { throws: | Error };
+    export function get_random_bytes(count: number): Uint8Array<ArrayBuffer>;
     export function get_random_int8_number(): number;
     export function get_random_uint8_number(): number;
 
@@ -50,15 +50,15 @@ declare module "simple-data-crypto" {
      * Derive a key for a file.
      */
     export async function derive_key_for_file(
-        file_reader: (start : number, end : number) => Promise<Uint8Array>,
-        user_key: string): Promise<Uint8Array>;
+        file_reader: (start : number, end : number) => Promise<Uint8Array<ArrayBuffer>>,
+        user_key: string): Promise<Uint8Array<ArrayBuffer>>;
     
     export function parse_ciphertext(message_encrypted: string): Promise<{
-        iv: Uint8Array;
-        ciphertext: Uint8Array;
-        tag: Uint8Array;
+        iv: Uint8Array<ArrayBuffer>;
+        ciphertext: Uint8Array<ArrayBuffer>;
+        tag: Uint8Array<ArrayBuffer>;
         phrase: string;
-        salt: Uint8Array;
+        salt: Uint8Array<ArrayBuffer>;
         N: number;
     }>;
         
@@ -80,11 +80,11 @@ declare module "simple-data-crypto" {
     /**
      * Decrypt data.
      * @param message_encrypted The ciphertext.
-     * @param key The key to decrypt the message. If provided as string, it will be automatically derived. If as Uint8Array, it will *not* be derived.
+     * @param key The key to decrypt the message. If provided as string, it will be automatically derived. If as Uint8Array<ArrayBuffer>, it will *not* be derived.
      * @returns The decrypted message.
      */
     export function decrypt_data(
-        message_encrypted: string, key: string | Uint8Array
+        message_encrypted: string, key: string | Uint8Array<ArrayBuffer>
     ): Promise<string> & {
         throws:
         | Exceptions.InvalidParameterException
@@ -93,15 +93,15 @@ declare module "simple-data-crypto" {
         | Exceptions.CannotDecryptException
     }
     
-    type FileReader = (start: number, end: number) => Promise<Uint8Array>;
-    type FileWriter = (data: Uint8Array) => Promise<void> | void;
+    type FileReader = (start: number, end: number) => Promise<Uint8Array<ArrayBuffer>>;
+    type FileWriter = (data: Uint8Array<ArrayBuffer>) => Promise<void> | void;
     type EncryptProgressCallback = (processed_bytes: number) => void;
     type DecryptProgressCallback = ((decrypted_bytes: number, processed_bytes: number) => void) | ((decrypted_bytes: number) => void);
 
     /**
      * Encrypt file
-     * @param file_reader - File reader object, should implement (start: number, end: number) => Promise<Uint8Array>
-     * @param file_writer - File writer object, should implement write(Uint8Array) method
+     * @param file_reader - File reader object, should implement (start: number, end: number) => Promise<Uint8Array<ArrayBuffer>>
+     * @param file_writer - File writer object, should implement write(Uint8Array<ArrayBuffer>) method
      * @param user_key - User key
      * @param callback - Progress callback function
      * @param phrase - Optional phrase for key derivation
@@ -127,16 +127,16 @@ declare module "simple-data-crypto" {
 
     /**
      * Decrypt file
-     * @param file_reader - File reader object, should implement (start: number, end: number) => Promise<Uint8Array>
-     * @param file_writer - File writer object, should implement write(Uint8Array) method
-     * @param user_key - User decryption key. If provided as string, it will be automatically derived. If as Uint8Array, it will *not* be derived.
+     * @param file_reader - File reader object, should implement (start: number, end: number) => Promise<Uint8Array<ArrayBuffer>>
+     * @param file_writer - File writer object, should implement write(Uint8Array<ArrayBuffer>) method
+     * @param user_key - User decryption key. If provided as string, it will be automatically derived. If as Uint8Array<ArrayBuffer>, it will *not* be derived.
      * @param callback - Progress callback function
      * @returns Returns whether decryption was successful or not
      */
     export function decrypt_file(
         file_reader: FileReader,
         file_writer: FileWriter,
-        user_key: string | Uint8Array,
+        user_key: string | Uint8Array<ArrayBuffer>,
         callback?: DecryptProgressCallback | null
     ): Promise<boolean> & {
         throws:
@@ -282,7 +282,7 @@ declare module "simple-data-crypto" {
         
     export class InputStream {
         constructor(
-            reader: (start: number, end: number, signal?: AbortSignal) => Promise<Uint8Array>,
+            reader: (start: number, end: number, signal?: AbortSignal) => Promise<Uint8Array<ArrayBuffer>>,
             size: number
         );
 
@@ -293,7 +293,7 @@ declare module "simple-data-crypto" {
             end: number,
             suggestion_end?: number | null,
             abort?: AbortController | null
-        ): Promise<Uint8Array>;
+        ): Promise<Uint8Array<ArrayBuffer>>;
 
         abort(): void;
         purge(): void;
@@ -319,15 +319,15 @@ declare module "simple-data-crypto" {
         END_MARKER: number[];
         FILE_END_MARKER: number[];
         nextTick: () => Promise<void>;
-        GetFileVersion: (file_reader: (start: number, end: number) => Promise<Uint8Array>) => Promise<string>;
-        GetFileChunkSize: (file_reader: (start: number, end: number) => Promise<Uint8Array>) => Promise<number>;
-        GetFileInfo: (file_reader: (start: number, end: number) => Promise<Uint8Array>) => Promise<FileInfoClass>;
+        GetFileVersion: (file_reader: (start: number, end: number) => Promise<Uint8Array<ArrayBuffer>>) => Promise<string>;
+        GetFileChunkSize: (file_reader: (start: number, end: number) => Promise<Uint8Array<ArrayBuffer>>) => Promise<number>;
+        GetFileInfo: (file_reader: (start: number, end: number) => Promise<Uint8Array<ArrayBuffer>>) => Promise<FileInfoClass>;
     }
 
     export const Internals: Internals;
 
     export function is_encrypted_message(message: string): Promise<boolean>;
-    export function is_encrypted_file(file_reader: (start: number, end: number) => Promise<Uint8Array>): Promise<boolean>;
+    export function is_encrypted_file(file_reader: (start: number, end: number) => Promise<Uint8Array<ArrayBuffer>>): Promise<boolean>;
 }
 
 export { Exceptions, Wrappers };
