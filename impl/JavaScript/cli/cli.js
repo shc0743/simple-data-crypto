@@ -69,11 +69,11 @@ class CryptCLI {
 
     async getPassword(options, purpose = 'password') {
         // If password is provided via command line
-        if (options.password) {
+        if (typeof options.password !== 'undefined') {
             //process.stderr.write(`Warning: Using password from command line is not secure\n`);
             return options.password;
         }
-
+        
         // If password file is specified
         if (options.passwordFile) {
             try {
@@ -214,6 +214,9 @@ class CryptCLI {
                 ]);
                 
                 const password = await this.getPassword(options, 'password');
+                if (password === '') {
+                    process.stderr.write('Warning: Using empty passwords is dangerous')
+                }
                 const encrypted = await encrypt_data(answers.inputData, password);
                 
                 if (outputFile) {
