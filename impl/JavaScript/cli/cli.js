@@ -6,6 +6,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import { spawn } from 'child_process';
 import { fileURLToPath } from 'url';
+import cliProgress from 'cli-progress';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -19,7 +20,7 @@ class CryptCLI {
         program
             .name('sdc-cli')
             .description('A useful CLI in Node.js to use simple-data-crypto library')
-            .version('1.0.0');
+            .version('1.1.0');
 
         // Encrypt command
         program
@@ -213,9 +214,9 @@ class CryptCLI {
                     }
                 ]);
                 
-                const password = await this.getPassword(options, 'password');
-                if (password === '') {
-                    process.stderr.write('Warning: Using empty passwords is dangerous')
+                const password = await this.getPassword(options, 'password') || '';
+                if ('' === password) {
+                    process.stderr.write('Warning: Using empty passwords is dangerous\n')
                 }
                 const encrypted = await encrypt_data(answers.inputData, password);
                 
@@ -231,9 +232,46 @@ class CryptCLI {
                 const fileReader = await this.createFileReader(inputFile);
                 const fileWriter = await this.createFileWriter(outputFile || '-');
                 if (inputFile === '-' && (!options.passwordScript)) options.passwordScript = 'sdc-askpass';
-                const password = await this.getPassword(options, 'password');
+                const password = await this.getPassword(options, 'password') || '';
+                if ('' === password) {
+                    process.stderr.write('Warning: Using empty passwords is dangerous\n')
+                }
 
-                const success = await encrypt_file(fileReader, fileWriter, password);
+                // Get file size for progress calculation
+                let totalBytes = 0;
+                if (inputFile !== '-') {
+                    try {
+                        const stats = await fs.stat(inputFile);
+                        totalBytes = stats.size;
+                    } catch (error) {
+                        // If can't get file size, use unknown total
+                        totalBytes = 0;
+                    }
+                }
+
+                // Create progress bar for file encryption
+                const progressBar = new cliProgress.SingleBar({
+                    format: 'Encrypting |{bar}| {percentage}% | {value}/{total} bytes',
+                    barCompleteChar: '\u2588',
+                    barIncompleteChar: '\u2591',
+                    hideCursor: true
+                });
+                
+                progressBar.start(totalBytes, 0);
+                
+                const success = await encrypt_file(
+                    fileReader, 
+                    fileWriter, 
+                    password,
+                    (processedBytes) => {
+                        progressBar.update(processedBytes);
+                    }
+                );
+                
+                if (totalBytes > 0) {
+                    progressBar.update(totalBytes);
+                }
+                progressBar.stop();
                 
                 if (success) {
                     if (outputFile) {
@@ -263,7 +301,7 @@ class CryptCLI {
                         waitUserInput: false
                     }
                 ]);
-                const password = await this.getPassword(options, 'password');
+                const password = await this.getPassword(options, 'password') || '';
 
                 const decrypted = await decrypt_data(answers.inputData, password);
                 
@@ -278,9 +316,44 @@ class CryptCLI {
                 const fileReader = await this.createFileReader(inputFile);
                 const fileWriter = await this.createFileWriter(outputFile || '-');
                 if (inputFile === '-' && (!options.passwordScript)) options.passwordScript = 'sdc-askpass';
-                const password = await this.getPassword(options, 'password');
+                const password = await this.getPassword(options, 'password') || '';
                 
-                const success = await decrypt_file(fileReader, fileWriter, password);
+                // Get file size for progress calculation
+                let totalBytes = 0;
+                if (inputFile !== '-') {
+                    try {
+                        const stats = await fs.stat(inputFile);
+                        totalBytes = stats.size;
+                    } catch (error) {
+                        // If can't get file size, use unknown total
+                        totalBytes = 0;
+                    }
+                }
+
+                // Create progress bar for file decryption
+                const progressBar = new cliProgress.SingleBar({
+                    format: 'Decrypting |{bar}| {percentage}% | {value}/{total} bytes',
+                    barCompleteChar: '\u2588',
+                    barIncompleteChar: '\u2591',
+                    hideCursor: true
+                });
+                
+                progressBar.start(totalBytes, 0);
+                
+                const success = await decrypt_file(
+                    fileReader, 
+                    fileWriter, 
+                    password,
+                    (decryptedBytes, processedBytes) => {
+                        // Use processedBytes (the bytes actually read from encrypted file)
+                        progressBar.update(processedBytes || decryptedBytes);
+                    }
+                );
+                
+                if (totalBytes > 0) {
+                    progressBar.update(totalBytes);
+                }
+                progressBar.stop();
                 
                 if (success) {
                     if (outputFile) {
@@ -307,7 +380,7 @@ class CryptCLI {
                 password: options.password,
                 passwordFile: options.passwordFile,
                 passwordScript: options.passwordScript
-            }, 'current password');
+            }, 'current password') || '';
 
             // Get new password
             const newPassword = await this.getPassword({
@@ -315,7 +388,11 @@ class CryptCLI {
                 passwordFile: options.newPasswordFile,
                 passwordScript: options.newPasswordScript,
                 skipConfirm: true
-            }, 'new password');
+            }, 'new password') || '';
+            
+            if ('' === newPassword) {
+                process.stderr.write('Warning: Using empty passwords is dangerous\n')
+            }
 
             // Read file header (first 5KB as recommended)
             let fileBuffer;
