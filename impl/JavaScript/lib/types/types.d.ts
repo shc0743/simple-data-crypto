@@ -93,21 +93,10 @@ declare module "simple-data-crypto" {
         | Exceptions.CannotDecryptException
     }
     
-    export async function encrypt_blob(
-        blob: Blob, password: string,
-        callback?: ProgressCallback | null,
-        phrase?: string | null,
-        N?: number | null,
-        chunk_size?: number
-    ): Promise<Blob>;
-    export async function decrypt_blob(
-        blob: Blob, password: string,
-        callback?: ProgressCallback | null
-    ): Promise<Blob>;
-    
     type FileReader = (start: number, end: number) => Promise<Uint8Array>;
     type FileWriter = (data: Uint8Array) => Promise<void> | void;
-    type ProgressCallback = (progress: number) => void;
+    type EncryptProgressCallback = (processed_bytes: number) => void;
+    type DecryptProgressCallback = ((decrypted_bytes: number, processed_bytes: number) => void) | ((decrypted_bytes: number) => void);
 
     /**
      * Encrypt file
@@ -124,7 +113,7 @@ declare module "simple-data-crypto" {
         file_reader: FileReader,
         file_writer: FileWriter,
         user_key: string,
-        callback?: ProgressCallback | null,
+        callback?: EncryptProgressCallback | null,
         phrase?: string | null,
         N?: number | null,
         chunk_size?: number
@@ -148,7 +137,7 @@ declare module "simple-data-crypto" {
         file_reader: FileReader,
         file_writer: FileWriter,
         user_key: string | Uint8Array,
-        callback?: ProgressCallback | null
+        callback?: DecryptProgressCallback | null
     ): Promise<boolean> & {
         throws:
         | TypeError
@@ -161,6 +150,18 @@ declare module "simple-data-crypto" {
         | Exceptions.CannotDecryptException
     };
 
+    export async function encrypt_blob(
+        blob: Blob, password: string,
+        callback?: EncryptProgressCallback | null,
+        phrase?: string | null,
+        N?: number | null,
+        chunk_size?: number
+    ): Promise<Blob>;
+    export async function decrypt_blob(
+        blob: Blob, password: string,
+        callback?: DecryptProgressCallback | null
+    ): Promise<Blob>;
+    
     /**
      * Export the file's master key.
      * @param file_head File header. Recommended to provide 5KB.

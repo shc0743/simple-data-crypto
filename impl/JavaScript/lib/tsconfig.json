@@ -21,6 +21,6 @@
         "src/**/*.js"
     ],
     "exclude": [
-        "src/WebScrypt/**"
+        "src/scrypt-layer/**"
     ]
 }

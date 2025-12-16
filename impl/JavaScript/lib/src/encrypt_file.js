@@ -24,7 +24,7 @@ const crypto = globalThis.crypto; // To avoid the possible security risk
  * @param {(start: number, end: number) => Promise<Uint8Array>} file_reader - 文件读取器对象，需要实现(start: number, end: number) => Promise<Uint8Array>
  * @param {(data: Uint8Array) => Promise<void>} file_writer - 文件写入器对象，需要实现write(Uint8Array)方法
  * @param {string} user_key - 用户密钥
- * @param {((progress: number) => void)|null} callback - 可选回调函数，用于报告加密进度
+ * @param {((processed_bytes: number) => void)|null} callback - 可选回调函数，用于报告加密进度
  * @param {string|null} phrase - 可选短语，用于密钥派生
  * @param {number|null} N - scrypt参数N
  * @param {number} chunk_size - 分块大小，默认为32MiB
@@ -185,7 +185,7 @@ export async function encrypt_file(file_reader, file_writer, user_key, callback 
  * @deprecated 仅供兼容1.1版本使用。
  * @param {(start: number, end: number) => Promise<Uint8Array>} file_reader - 文件读取器对象，需要实现(start: number, end: number) => Promise<Uint8Array>
  * @param {Function} file_writer - 文件写入器对象，需要实现write(Uint8Array)方法
- * @param {((progress: number) => void)|null} callback - 可选回调函数，用于报告加密进度
+ * @param {((decrypted_bytes: number, processed_bytes: number) => void)|((decrypted_bytes: number) => void)|null} callback - 可选回调函数，用于报告加密进度
  * @param {string} user_key - 用户提供的解密密钥
  * @param {Function} [callback=null] - 进度回调函数
  * @returns {Promise<boolean>} 返回解密是否成功
@@ -228,7 +228,7 @@ export async function decrypt_file_V_1_1_0(file_reader, file_writer, user_key, c
     const N = header_json.N;
 
     // 对应加密时，需要提供一个iv，我们把iv取回来，重新生成密钥（所有数据块的密钥是相同的）
-    callback?.(0);
+    callback?.(0, 0);
     await nextTick();
     const { derived_key } = await derive_key(key, iv4key, phrase, N, salt);
 
@@ -271,7 +271,7 @@ export async function decrypt_file_V_1_1_0(file_reader, file_writer, user_key, c
         // 写入解密后的数据
         await file_writer(new Uint8Array(decrypted));
         total_bytes += decrypted.byteLength;
-        if (callback) callback(total_bytes);
+        if (callback) callback(total_bytes, read_pos);
     }
 
     // 验证总字节数和结束标记
@@ -284,6 +284,8 @@ export async function decrypt_file_V_1_1_0(file_reader, file_writer, user_key, c
     const end_marker = await file_reader(read_pos, read_pos + 2);
     if (total_bytes !== total_bytes_decrypted) throw new Exceptions.FileCorruptedException("File corrupted: total bytes mismatch")
     if (!end_marker.every((v, i) => v === [0x55, 0xAA][i])) throw new Exceptions.InvalidEndMarkerException("Invalid end marker");
+    
+    if (callback) callback(total_bytes, read_pos + 2);
 
     return true;
 }
@@ -292,7 +294,7 @@ export async function decrypt_file_V_1_1_0(file_reader, file_writer, user_key, c
  * @param {(start: number, end: number) => Promise<Uint8Array>} file_reader - 文件读取器对象，需要实现(start: number, end: number) => Promise<Uint8Array>
  * @param {(data: Uint8Array) => Promise<void>} file_writer - 文件写入器对象，需要实现write(Uint8Array)方法
  * @param {string|Uint8Array} user_key - 用户提供的解密密钥（字符串）或者派生后的密钥（Uint8Array）
- * @param {((progress: number) => void)|null} callback - 可选回调函数，用于报告加密进度
+ * @param {((decrypted_bytes: number, processed_bytes: number) => void)|((decrypted_bytes: number) => void)|null} callback - 可选回调函数，用于报告加密进度
  * @returns {Promise<boolean>} 返回解密是否成功
  */
 export async function decrypt_file(file_reader, file_writer, user_key, callback = null) {
@@ -304,9 +306,10 @@ export async function decrypt_file(file_reader, file_writer, user_key, callback 
         throw new Exceptions.InvalidParameterException("user_key must be a string or ArrayBuffer or Uint8Array");
     }
     const original_callback = callback;
-    callback = (typeof callback === 'function') ? async function UserCallback(progress) {
+    callback = (typeof callback === 'function') ? async function UserCallback(d, p) {
         try {
-            const r = original_callback?.(progress);
+            // @ts-ignore
+            const r = original_callback?.(d, p);
             // @ts-ignore
             if ((r) && (r instanceof Promise)) await r;
         } catch (e) {
@@ -364,7 +367,7 @@ export async function decrypt_file(file_reader, file_writer, user_key, callback 
     read_pos += 16;
 
     // 对应加密时，需要提供一个iv，我们把iv取回来，重新生成密钥（所有数据块的密钥是相同的）
-    await callback?.(0);
+    await callback?.(0, 0);
     await nextTick();
     const derived_key = (typeof user_key === 'string') ? (
         key ? ((await derive_key(key, iv4key, phrase, N, salt)).derived_key) : Exceptions.raise(new Exceptions.InternalError())
@@ -431,7 +434,7 @@ export async function decrypt_file(file_reader, file_writer, user_key, callback 
             if (name === 'OperationError') throw new Exceptions.UnexpectedFailureInChunkDecryptionException(undefined, { cause: e });
             throw new Exceptions.InternalError(`Unexpected error.`, { cause: e });
         }
-        if (callback) await callback(total_bytes);
+        if (callback) await callback(total_bytes, read_pos);
     }
 
     // 验证总字节数和结束标记
@@ -442,8 +445,10 @@ export async function decrypt_file(file_reader, file_writer, user_key, callback 
     read_pos += 8;
 
     const end_marker = await file_reader(read_pos, read_pos + FILE_END_MARKER.length);
-    if (total_bytes !== total_bytes_decrypted) throw new Exceptions.FileCorruptedException("total bytes mismatch")
+    if (total_bytes !== total_bytes_decrypted) throw new Exceptions.FileCorruptedException("Total bytes mismatch")
     if (!end_marker.every((v, i) => v === FILE_END_MARKER[i])) throw new Exceptions.InvalidEndMarkerException();
+    
+    if (callback) await callback(total_bytes, read_pos + FILE_END_MARKER.length);
 
     return true;
 }
@@ -452,7 +457,7 @@ export async function decrypt_file(file_reader, file_writer, user_key, callback 
 /**
  * @param {Blob} blob
  * @param {string} password
- * @param {((progress: number) => void)|null} callback - 可选回调函数，用于报告加密进度
+ * @param {((processed_bytes: number) => void)|null} callback - 可选回调函数，用于报告加密进度
  * @param {string|null} phrase - 可选短语，用于密钥派生
  * @param {number|null} N - scrypt参数N
  * @param {number} chunk_size - 分块大小，默认为32MiB
@@ -469,7 +474,7 @@ export async function encrypt_blob(blob, password, callback, phrase, N, chunk_si
 /**
  * @param {Blob} blob
  * @param {string | Uint8Array} password
- * @param {((progress: number) => void)|null} callback - 可选回调函数，用于报告加密进度
+ * @param {((decrypted_bytes: number, processed_bytes: number) => void)|((decrypted_bytes: number) => void)|null} callback - 可选回调函数，用于报告加密进度
  * @returns {Promise<Blob>}
  */
 export async function decrypt_blob(blob, password, callback) {

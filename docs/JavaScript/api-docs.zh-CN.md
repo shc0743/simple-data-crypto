@@ -4,7 +4,7 @@
 
 # API 列表
 
-有关更多详细信息，请参阅 [d.ts 文件](../../impl/JavaScript/lib/dist/main.bundle.d.ts)。
+有关更多详细信息，请参阅 [d.ts 文件](../../impl/JavaScript/lib/types/types.d.ts)。
 
 ## 最近的破坏性变更
 
@@ -13,6 +13,8 @@
 ## 核心功能
 
 大多数情况下您仅会使用以下功能：
+
+## 字符串或数据加密
 
 ### `encrypt_data(message, key, phrase = null, N = null)`
 
@@ -36,7 +38,7 @@
   - `key`: `string` - 解密密钥。
 - **返回值**：`string | ArrayBuffer` - 解密后的消息。
 
----
+## 文件加密
 
 ### `encrypt_file(file_reader, file_writer, user_key, callback = null, phrase = null, N = null, chunk_size = 32 * 1024 * 1024)`
 
@@ -46,7 +48,7 @@
   - `file_reader`: `(start: number, end: number) => Promise<Uint8Array>` - 文件读取函数。
   - `file_writer`: `(data: Uint8Array) => Promise<void> | void` - 文件写入函数。
   - `user_key`: `string` - 用户密钥。
-  - `callback`: `(progress: number, total: number) => void` (可选) - 进度回调。
+  - `callback`: `((processed_bytes: number) => void) | null` (可选) - 进度回调。`processed_bytes` 是已处理的字节数。
   - `phrase`: `string | null` (可选) - 可选的密码短语。
   - `N`: `number | null` (可选) - scrypt 参数 N。
   - `chunk_size`: `number` (可选) - 分块大小（默认：32MiB）。
@@ -62,10 +64,39 @@
   - `file_reader`: `(start: number, end: number) => Promise<Uint8Array>` - 文件读取函数。
   - `file_writer`: `(data: Uint8Array) => Promise<void> | void` - 文件写入函数。
   - `user_key`: `string` - 用户解密密钥。
-  - `callback`: `(progress: number, total: number) => void` (可选) - 进度回调。
+  - `callback`: `((decrypted_bytes: number, processed_bytes: number) => void) | ((decrypted_bytes: number) => void) | null` (可选) - 进度回调。`processed_bytes` 是已处理的字节数，`decrypted_bytes` 是原文件已解密完成的字节数（通常比 `processed_bytes` 小一些）。
 - **返回值**：`Promise<boolean>` - 解密是否成功。
 
+## Blob 加密
+
+### `export async function encrypt_blob(blob: Blob, password: string, callback?: EncryptProgressCallback | null, phrase?: string | null, N?: number | null, chunk_size?: number): Promise<Blob>`
+
+异步加密 Blob 对象。
+
+- **参数**：
+  - `blob`: `Blob` - 要加密的原始数据 Blob 对象。
+  - `password`: `string` - 用户密码，用于生成加密密钥。
+  - `callback`: `EncryptProgressCallback | null` (可选) - 加密进度回调函数。类型为 `(processed_bytes: number) => void`，其中 `processed_bytes` 是已处理的字节数。
+  - `phrase`: `string | null` (可选) - 可选的密码短语。
+  - `N`: `number | null` (可选) - scrypt 算法的 N 参数。
+  - `chunk_size`: `number` (可选) - 分块处理大小（字节）。默认 32 MiB 。
+- **返回值**：`Promise<Blob>` - 返回加密后的新 Blob 对象。
+
 ---
+
+### `export async function decrypt_blob(blob: Blob, password: string, callback?: DecryptProgressCallback | null): Promise<Blob>`
+
+异步解密 Blob 对象。
+
+- **参数**：
+  - `blob`: `Blob` - 要解密的加密数据 Blob 对象（必须是由 `encrypt_blob` 生成的格式）。
+  - `password`: `string` - 用户密码，必须与加密时使用的密码相同。
+  - `callback`: `DecryptProgressCallback | null` (可选) - 解密进度回调函数。类型为 `(decrypted_bytes: number, processed_bytes: number) => void` 或 `(decrypted_bytes: number) => void`。
+    - `decrypted_bytes`: 已解密并恢复的原始数据字节数
+    - `processed_bytes`: 已处理的加密数据字节数（通常更大，因为包含元数据）
+- **返回值**：`Promise<Blob>` - 返回解密后的原始数据 Blob 对象。
+
+## 状态检测
 
 ### `is_encrypted_file(file_reader)`
 
@@ -85,7 +116,7 @@
   - `message`: `string` - 要检查的消息。
 - **返回值**：`boolean` - 消息是否已加密。
 
----
+## 加密文件管理
 
 ### `export_master_key(file_head, current_key, export_key)`
 
@@ -115,8 +146,6 @@
 * 另外，由于这个特性，大文件相关操作会变得非常非常慢。
 * 所以，除非特殊情况，务必始终使用 native 应用程序来修改文件密码
 
----
-
 ## 上下文管理
 
 大多数情况下，不需要使用上下文对象。目前仅流解密需要上下文。
@@ -136,8 +165,6 @@
 - **参数**：
   - `ctx`: `CryptContext` - 要销毁的上下文。
 - **返回值**：`Promise<true>`。
-
----
 
 ## 流式解密
 
@@ -182,8 +209,6 @@
   - `close()`：关闭流。
 - **属性**：
   - `size`: `number | null` - 流的大小。
-
----
 
 ## 内部 API（高级用户）
 
@@ -242,8 +267,6 @@
 ### `Internals` 对象
 
 提供一系列获取内部实现相关信息的导出函数。高级用户可以通过查看 [实现](../../impl/JavaScript/lib/src/internal-util.js) 来了解更多细节。这些部分不提供文档。
-
----
 
 ## 未文档的 API
 
