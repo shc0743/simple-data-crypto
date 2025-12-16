@@ -6,7 +6,7 @@ import { scrypt } from './scrypt-layer/entrance.js';
 import { decrypt_data } from "./encrypt_data.js";
 import { GetFileVersion, ENCRYPTION_FILE_VER_1_1_0, PADDING_SIZE, CheckAlgorithm, ENCRYPTION_FILE_VER_1_2_10020 } from "./internal-util.js";
 
-export const deriveKey__phrases = ['Furina', 'Neuvillette', 'Venti', 'Nahida', 'Kinich', 'Kazuha'];
+export const deriveKey__phrases = ['Elysia', 'Kiana', 'Raiden', 'Bronya', 'Seele', 'Kevin', 'Cyrene', 'Furina', 'Neuvillette', 'Venti', 'Nahida', 'Kinich', 'Kazuha'];
 /**
  * Derive a key from a phrase and a key.
  * @param {string} key 

@@ -1256,7 +1256,7 @@ async function decrypt_data(message_encrypted, key) {
 }
 
 // src/derive_key.js
-var deriveKey__phrases = ["Furina", "Neuvillette", "Venti", "Nahida", "Kinich", "Kazuha"];
+var deriveKey__phrases = ["Elysia", "Kiana", "Raiden", "Bronya", "Seele", "Kevin", "Cyrene", "Furina", "Neuvillette", "Venti", "Nahida", "Kinich", "Kazuha"];
 async function derive_key(key, iv, phrase = null, N = null, salt = null, r = 8, p = 1, dklen = 32) {
   if (!N) N = 262144;
   if (typeof N !== "number" || N > 4194304 || r < 1 || p < 1 || typeof r !== "number" || typeof p !== "number" || typeof dklen !== "number" || !((N & N - 1) === 0)) {
@@ -1443,7 +1443,7 @@ async function decrypt_file_V_1_1_0(file_reader, file_writer, user_key, callback
   const salt = unhexlify(salt_hex);
   const iv4key = unhexlify(header_json.iv);
   const N = header_json.N;
-  callback?.(0);
+  callback?.(0, 0);
   await nextTick();
   const { derived_key } = await derive_key(key, iv4key, phrase, N, salt);
   let total_bytes = 0;
@@ -1472,7 +1472,7 @@ async function decrypt_file_V_1_1_0(file_reader, file_writer, user_key, callback
     );
     await file_writer(new Uint8Array(decrypted));
     total_bytes += decrypted.byteLength;
-    if (callback) callback(total_bytes);
+    if (callback) callback(total_bytes, read_pos);
   }
   const total_bytes_bytes = await file_reader(read_pos, read_pos + 8);
   const total_bytes_decrypted = Number(
@@ -1482,6 +1482,7 @@ async function decrypt_file_V_1_1_0(file_reader, file_writer, user_key, callback
   const end_marker = await file_reader(read_pos, read_pos + 2);
   if (total_bytes !== total_bytes_decrypted) throw new FileCorruptedException("File corrupted: total bytes mismatch");
   if (!end_marker.every((v, i) => v === [85, 170][i])) throw new InvalidEndMarkerException("Invalid end marker");
+  if (callback) callback(total_bytes, read_pos + 2);
   return true;
 }
 async function decrypt_file(file_reader, file_writer, user_key, callback = null) {
@@ -1492,9 +1493,9 @@ async function decrypt_file(file_reader, file_writer, user_key, callback = null)
     throw new InvalidParameterException("user_key must be a string or ArrayBuffer or Uint8Array");
   }
   const original_callback = callback;
-  callback = typeof callback === "function" ? async function UserCallback(progress) {
+  callback = typeof callback === "function" ? async function UserCallback(d, p) {
     try {
-      const r = original_callback?.(progress);
+      const r = original_callback?.(d, p);
       if (r && r instanceof Promise) await r;
     } catch (e) {
       throw new UnhandledExceptionInUserCallback("An unhandled exception was encountered during a user callback.", { cause: e });
@@ -1531,7 +1532,7 @@ async function decrypt_file(file_reader, file_writer, user_key, callback = null)
   const chunk_size = Number(new DataView((await file_reader(read_pos, read_pos + 8)).buffer).getBigUint64(0, true));
   let nonce_counter = BigInt(new DataView((await file_reader(read_pos + 8, read_pos + 16)).buffer).getBigUint64(0, true));
   read_pos += 16;
-  await callback?.(0);
+  await callback?.(0, 0);
   await nextTick();
   const derived_key = typeof user_key === "string" ? key ? (await derive_key(key, iv4key, phrase, N, salt)).derived_key : raise(new InternalError()) : user_key;
   let total_bytes = 0, is_final_chunk = false;
@@ -1579,7 +1580,7 @@ async function decrypt_file(file_reader, file_writer, user_key, callback = null)
       if (name === "OperationError") throw new UnexpectedFailureInChunkDecryptionException(void 0, { cause: e });
       throw new InternalError(`Unexpected error.`, { cause: e });
     }
-    if (callback) await callback(total_bytes);
+    if (callback) await callback(total_bytes, read_pos);
   }
   const total_bytes_bytes = await file_reader(read_pos, read_pos + 8);
   const total_bytes_decrypted = Number(
@@ -1587,8 +1588,9 @@ async function decrypt_file(file_reader, file_writer, user_key, callback = null)
   );
   read_pos += 8;
   const end_marker = await file_reader(read_pos, read_pos + FILE_END_MARKER.length);
-  if (total_bytes !== total_bytes_decrypted) throw new FileCorruptedException("total bytes mismatch");
+  if (total_bytes !== total_bytes_decrypted) throw new FileCorruptedException("Total bytes mismatch");
   if (!end_marker.every((v, i) => v === FILE_END_MARKER[i])) throw new InvalidEndMarkerException();
+  if (callback) await callback(total_bytes, read_pos + FILE_END_MARKER.length);
   return true;
 }
 async function encrypt_blob(blob, password, callback, phrase, N, chunk_size) {
@@ -1726,12 +1728,12 @@ async function crypt_context_destroy(ctx) {
 // src/stream.js
 var crypto4 = globalThis.crypto;
 var InputStream = class {
-  /** @type {((start: number, end: number, signal?: AbortSignal) => Promise<Uint8Array>) | null} */
+  /** @type {((start: number, end: number, signal?: AbortSignal) => Promise<Uint8Array<ArrayBuffer>>) | null} */
   #reader;
   #cache = {
     position: 0,
     end: 0,
-    /** @type {?Uint8Array} */
+    /** @type {?Uint8Array<ArrayBuffer>} */
     data: null
   };
   #size;
@@ -1739,7 +1741,7 @@ var InputStream = class {
     return "Stream";
   }
   /**
-   * @param {(start: number, end: number, signal?: AbortSignal) => Promise<Uint8Array>} reader The reader function
+   * @param {(start: number, end: number, signal?: AbortSignal) => Promise<Uint8Array<ArrayBuffer>>} reader The reader function
    * @param {number} size The size of the stream
    */
   constructor(reader, size) {
@@ -1759,7 +1761,7 @@ var InputStream = class {
    * @param {Number} end end pos
    * @param {Number|null} suggestion_end The suggested end. Used for caching.
    * @param {AbortController|null} abort The abort controller. Used for aborting the read.
-   * @returns {Promise<Uint8Array>}
+   * @returns {Promise<Uint8Array<ArrayBuffer>>}
    */
   async read(start, end, suggestion_end = null, abort = null) {
     if (!this.#reader) throw new Error("Stream: The stream has been closed.");
@@ -1990,7 +1992,7 @@ async function createWriterForMemoryBuffer(bufferOutput) {
 }
 
 // src/version.js
-var VERSION = "Encryption/5.6 FileEncryption/1.2 Patch/56.11 Package/1.56.11";
+var VERSION = "Encryption/5.6 FileEncryption/1.2 Patch/100.0 Package/1.100.0";
 export {
   CRYPT_CONTEXT as CryptContext,
   ENCRYPTION_FILE_VER_1_1_0,

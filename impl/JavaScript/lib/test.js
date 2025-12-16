@@ -1,7 +1,6 @@
 import http from 'http';
 import fs from 'fs';
 import path from 'path';
-import url from 'url';
 import { exec, spawn } from 'child_process';
 
 if (process.argv.includes("help") || process.argv.includes("--help")) {
@@ -197,7 +196,7 @@ if (skip_tests.includes("node-test")) {
     {
         const key = 'mykeylalala123'
         const iv = new Uint8Array(await new Blob(['bebebe45609']).arrayBuffer());
-        const phrase = 'Furina';
+        const phrase = 'TestPhrase';
         const dk1 = await derive_key(key, iv, phrase, scN, new Uint8Array(await new Blob([scsalt, 'exex']).arrayBuffer()), scr, scp, scdklen);
         unitLog('dk1=', dk1);
         const dk2 = await derive_key(key, iv, phrase, scN, new Uint8Array(await new Blob([scsalt, 'exex']).arrayBuffer()), scr, scp, scdklen);
@@ -237,7 +236,7 @@ if (skip_tests.includes("browser-test")) {
     let ttid = 0;
 
     const server = http.createServer((req, res) => {
-        const requestPath = url.parse(req.url).pathname;
+        const requestPath = (new URL(req.url, 'http://127.0.0.1')).pathname;
         const filePath = path.join(process.cwd(), requestPath);
 
         try {
