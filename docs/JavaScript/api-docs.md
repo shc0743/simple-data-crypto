@@ -8,6 +8,7 @@ See [the d.ts file](../../impl/JavaScript/lib/types/types.d.ts) for more details
 
 ## Recent Breaking Changes
 
+[>=1.101.0] Changed default entry's `browser`, `import` and `default` to `main.bundle.builder.js`, which inlines the ASM.JS code. This leads to easier use, but in some strict environments such as CSP-restricted where blob: is forbidden, you may need to use the `browser` entry. It uses the previous version's external format.
 [>=1.5.0] The `Stream` was renamed to `InputStream`. There is no API change, just a re-naming.
 
 ## Core Functions

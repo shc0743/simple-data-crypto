@@ -93,7 +93,8 @@ example();
 使用 Vite 或其他构建工具的环境：
 
 ```javascript
-import { encrypt_data, decrypt_data } from'simple-data-crypto/builder'; // 必须手动指定
+// import { encrypt_data, decrypt_data } from'simple-data-crypto/builder'; // 必须手动指定
+import { encrypt_data, decrypt_data } from'simple-data-crypto'; // >=1.101.0 版本无需这样使用，直接导入即可
 
 // 使用方式与上面相同
 ```

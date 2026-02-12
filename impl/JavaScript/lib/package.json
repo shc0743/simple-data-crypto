@@ -1,6 +1,6 @@
 {
     "name": "simple-data-crypto",
-    "version": "1.100.0",
+    "version": "1.101.0",
     "description": "A comprehensive encryption library providing simple tools for data and file encryption/decryption with modern cryptographic standards, works well with node and build tools.",
     "main": "src/main.js",
     "type": "module",
@@ -18,10 +18,10 @@
     "exports": {
         ".": {
             "node": "./dist/main.bundle.node.js",
-            "browser": "./dist/main.bundle.min.js",
-            "import": "./dist/main.bundle.js",
+            "browser": "./dist/main.bundle.builder.js",
+            "import": "./dist/main.bundle.builder.js",
             "types": "./types/types.d.ts",
-            "default": "./dist/main.bundle.js"
+            "default": "./dist/main.bundle.builder.js"
         },
         "./node": {
             "types": "./types/node.d.ts",

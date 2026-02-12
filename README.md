@@ -94,7 +94,8 @@ example();
 When using Vite or other build tools:
 
 ```javascript
-import { encrypt_data, decrypt_data } from 'simple-data-crypto/builder'; // Must specify manually
+// import { encrypt_data, decrypt_data } from 'simple-data-crypto/builder'; // Must specify manually
+import { encrypt_data, decrypt_data } from 'simple-data-crypto'; // >=1.101.0 version does not require this, just import directly
 
 // Usage is the same as above
 ```

@@ -8,6 +8,7 @@
 
 ## 最近的破坏性变更
 
+[>=1.101.0] 默认入口的 `browser`, `import` 和 `default` 被改为 `main.bundle.builder.js`，内联了 ASM.JS 代码。这使得使用更加方便，但在一些严格环境（如 CSP 受限，blob: 被禁止）下，您可能需要使用 `browser` 入口。`browser` 入口使用了上一个版本的外部格式导入 ASM.JS 代码。
 [>=1.5.0] `Stream` 被重命名为 `InputStream`。没有实际上的 API 更改，但（如果用到）需要重命名。
 
 ## 核心功能
