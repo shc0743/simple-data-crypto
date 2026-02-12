@@ -6,7 +6,6 @@ import {
     decrypt_blob,
     InputStream,
 } from 'simple-data-crypto/builder';
-import { PlayMp4Video } from 'play-video-streamed';
 import 'common-file-preview';
 
 export class HTMLSimpleDataCryptoFilePreviewElement extends HTMLElement {
@@ -85,6 +84,7 @@ export class HTMLSimpleDataCryptoFilePreviewElement extends HTMLElement {
         this.#ctx = await crypt_context_create(password);
         const stream = new InputStream(fileReader, size);
         await decrypt_stream_init(this.#ctx, stream, password);
+        const { PlayMp4Video } = await import('play-video-streamed');
         this.#cleanup = await PlayMp4Video(np, (async (start, end, controller) => {
             const buffer = await decrypt_stream(this.#ctx, start, end, controller);
             return buffer;
