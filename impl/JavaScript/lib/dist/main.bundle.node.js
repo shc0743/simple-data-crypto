@@ -1075,7 +1075,7 @@ function nextTick() {
 function normalize_version(major_version, version_marker = null) {
   if (!major_version) return `Unknown Version`;
   let vm = String(version_marker);
-  if (String(major_version) === "1.1") vm = "null";
+  if (String(major_version) === "1.1") vm = "0";
   if (!version_marker) return `${major_version}/0`;
   return `${major_version}/${vm}`;
 }
@@ -1992,7 +1992,7 @@ async function createWriterForMemoryBuffer(bufferOutput) {
 }
 
 // src/version.js
-var VERSION = "Encryption/5.6 FileEncryption/1.2 Patch/100.0 Package/1.100.0";
+var VERSION = "Encryption/5.6 FileEncryption/1.2 Patch/101.1 Package/1.101.1";
 export {
   CRYPT_CONTEXT as CryptContext,
   ENCRYPTION_FILE_VER_1_1_0,

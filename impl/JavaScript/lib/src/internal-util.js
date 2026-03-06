@@ -38,7 +38,7 @@ export function nextTick() {
 export function normalize_version(major_version, version_marker = null) {
     if (!major_version) return `Unknown Version`;
     let vm = String(version_marker);
-    if (String(major_version) === '1.1') vm = 'null';
+    if (String(major_version) === '1.1') vm = '0';
     if (!version_marker) return `${major_version}/0`;
     return `${major_version}/${vm}`;
 }
