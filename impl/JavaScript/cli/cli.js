@@ -7,9 +7,15 @@ import path from 'path';
 import { spawn } from 'child_process';
 import { fileURLToPath } from 'url';
 import cliProgress from 'cli-progress';
+import { sha256File } from './sha256file.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+const exists = async name => {
+    try { await fs.access(name); return true }
+    catch { return false }
+};
 
 class CryptCLI {
     constructor() {
@@ -20,16 +26,19 @@ class CryptCLI {
         program
             .name('sdc-cli')
             .description('A useful CLI in Node.js to use simple-data-crypto library')
-            .version('1.1.0');
+            .version('1.2.0');
 
         // Encrypt command
         program
             .command('encrypt')
             .description('Encrypt file or data')
             .option('--password <password>', 'Specify password directly (NOT RECOMMENDED for security reasons because this exposes the password in the command line)')
-            .option('--password-file <file>', 'Read password from specified file')
+            .option('--password-file <file>', 'Read password text from specified file (binary file not supported)')
+            .option('--password-data <file>', 'Use a binary file\'s SHA256 hash as the password')
             .option('--password-script <script>', 'Execute script and read password from its stdout (similar to GIT_ASKPASS)')
+            .option('-r', 'Do not trim the password')
             .option('-k, --skip-confirm', 'Skip password confirmation for encryption')
+            .option('-f, --force', 'Force overrides the output file')
             .argument('[inputFile]', 'Input file path (empty for string encryption, "-" for stdin)')
             .argument('[outputFile]', 'Output file path (stdout if not specified)')
             .action(this.handleEncrypt.bind(this));
@@ -39,8 +48,11 @@ class CryptCLI {
             .command('decrypt')
             .description('Decrypt file or data')
             .option('--password <password>', 'Specify password directly (NOT RECOMMENDED for security reasons)')
-            .option('--password-file <file>', 'Read password from specified file')
+            .option('--password-file <file>', 'Read password text from specified file (binary file not supported)')
+            .option('--password-data <file>', 'Use a binary file\'s SHA256 hash as the password')
             .option('--password-script <script>', 'Execute script and read password from its stdout (similar to GIT_ASKPASS)')
+            .option('-r', 'Do not trim the password')
+            .option('-f, --force', 'Force overrides the output file')
             .argument('[inputFile]', 'Input file path (empty for string decryption, "-" for stdin)')
             .argument('[outputFile]', 'Output file path (stdout if not specified)')
             .action(this.handleDecrypt.bind(this));
@@ -50,11 +62,15 @@ class CryptCLI {
             .command('change-password')
             .description('Change password of encrypted file')
             .option('--password <password>', 'Specify current password directly (NOT RECOMMENDED)')
-            .option('--password-file <file>', 'Read current password from specified file')
+            .option('--password-file <file>', 'Read current password text from specified file')
+            .option('--password-data <file>', 'Use a binary file\'s SHA256 hash as the current password')
             .option('--password-script <script>', 'Execute script and read current password from its stdout')
             .option('--new-password <password>', 'Specify new password directly (NOT RECOMMENDED)')
-            .option('--new-password-file <file>', 'Read new password from specified file')
+            .option('--new-password-file <file>', 'Read new password text from specified file')
+            .option('--new-password-data <file>', 'Use a binary file\'s SHA256 hash as the new password')
             .option('--new-password-script <script>', 'Execute script and read new password from its stdout')
+            .option('-r', 'Do not trim the password')
+            .option('-f, --force', 'Force overrides the output file (if specified outputFile)')
             .argument('<inputFile>', 'Input file path (cannot be empty, "-" for stdin)')
             .argument('[outputFile]', 'Output file path (in-place modification if not specified)')
             .action(this.handleChangePassword.bind(this));
@@ -75,13 +91,40 @@ class CryptCLI {
             return options.password;
         }
         
+        // If password data is specified
+        if (options.passwordData) {
+            const progressBar = new cliProgress.SingleBar({
+                format: 'Computing password |{bar}| {percentage}% | {value}/{total} bytes',
+                barCompleteChar: '\u2588',
+                barIncompleteChar: '\u2591',
+                hideCursor: true
+            });
+            progressBar.start(0, 0);
+            try {
+                return await sha256File(options.passwordData, (_, bytesRead, totalSize) => {
+                    if (progressBar.getTotal() !== totalSize) {
+                        progressBar.setTotal(totalSize);
+                    }
+                    progressBar.update(bytesRead);
+                });
+            } catch (error) {
+                throw new Error(`Failed to read password from file: ${error}`);
+            } finally {
+                progressBar.stop();
+            }
+        }
+        
         // If password file is specified
         if (options.passwordFile) {
             try {
                 const password = await fs.readFile(options.passwordFile, 'utf8');
-                return password.trim();
+                if (password.includes('\ufffd')) process.stderr.write('Caution: Password file doesn\'t seem like UTF-8 text, this may cause dangerous encryption\n');
+                if (options.r) return password;
+                const trimmed = password.trim();
+                if (trimmed !== password) process.stdout.write('Warning: Password was trimmed');
+                return trimmed;
             } catch (error) {
-                throw new Error(`Failed to read password from file: ${error.message}`);
+                throw new Error(`Failed to read password from file: ${error}`);
             }
         }
 
@@ -97,7 +140,10 @@ class CryptCLI {
 
                 child.on('close', (code) => {
                     if (code === 0) {
-                        resolve(stdout.trim());
+                        if (options.r) resolve(stdout);
+                        const trimmed = stdout.trim();
+                        if (trimmed !== password) process.stdout.write('Warning: Password was trimmed');
+                        resolve(trimmed);
                     } else {
                         reject(new Error(`Password script failed with code ${code}`));
                     }
@@ -167,13 +213,14 @@ class CryptCLI {
         }
     }
     
-    async createFileWriter(filePath) {
+    async createFileWriter(filePath, force = false) {
         if (filePath === '-') {
             return (data) => {
                 process.stdout.write(Buffer.from(data));
                 return Promise.resolve();
             };
         } else {
+            if (!force && (await exists(filePath))) throw new Error('Output file already exists')
             const fileHandle = await fs.open(filePath, 'w');
             return async (data) => {
                 await fileHandle.write(Buffer.from(data));
@@ -196,6 +243,7 @@ class CryptCLI {
     }
 
     async handleEncrypt(inputFile, outputFile, options) {
+        let progressBar;
         try {
             // Auto set skipConfirm if password is provided via non-interactive methods
             if (options.password || options.passwordFile || options.passwordScript) {
@@ -230,7 +278,7 @@ class CryptCLI {
             } else {
                 // File encryption
                 const fileReader = await this.createFileReader(inputFile);
-                const fileWriter = await this.createFileWriter(outputFile || '-');
+                const fileWriter = await this.createFileWriter(outputFile || '-', options.force);
                 if (inputFile === '-' && (!options.passwordScript)) options.passwordScript = 'sdc-askpass';
                 const password = await this.getPassword(options, 'password') || '';
                 if ('' === password) {
@@ -250,7 +298,7 @@ class CryptCLI {
                 }
 
                 // Create progress bar for file encryption
-                const progressBar = new cliProgress.SingleBar({
+                progressBar = new cliProgress.SingleBar({
                     format: 'Encrypting |{bar}| {percentage}% | {value}/{total} bytes',
                     barCompleteChar: '\u2588',
                     barIncompleteChar: '\u2591',
@@ -272,6 +320,7 @@ class CryptCLI {
                     progressBar.update(totalBytes);
                 }
                 progressBar.stop();
+                progressBar = null;
                 
                 if (success) {
                     if (outputFile) {
@@ -282,12 +331,14 @@ class CryptCLI {
                 }
             }
         } catch (error) {
+            if (progressBar) (progressBar.stop(), process.stderr.write('\n'));
             process.stderr.write(`${error}\n`);
             process.exit(1);
         }
     }
 
     async handleDecrypt(inputFile, outputFile, options) {
+        let progressBar;
         try {
             options.skipConfirm = true;
             if (!inputFile) {
@@ -314,7 +365,7 @@ class CryptCLI {
             } else {
                 // File decryption
                 const fileReader = await this.createFileReader(inputFile);
-                const fileWriter = await this.createFileWriter(outputFile || '-');
+                const fileWriter = await this.createFileWriter(outputFile || '-', options.force);
                 if (inputFile === '-' && (!options.passwordScript)) options.passwordScript = 'sdc-askpass';
                 const password = await this.getPassword(options, 'password') || '';
                 
@@ -331,7 +382,7 @@ class CryptCLI {
                 }
 
                 // Create progress bar for file decryption
-                const progressBar = new cliProgress.SingleBar({
+                progressBar = new cliProgress.SingleBar({
                     format: 'Decrypting |{bar}| {percentage}% | {value}/{total} bytes',
                     barCompleteChar: '\u2588',
                     barIncompleteChar: '\u2591',
@@ -354,6 +405,7 @@ class CryptCLI {
                     progressBar.update(totalBytes);
                 }
                 progressBar.stop();
+                progressBar = null;
                 
                 if (success) {
                     if (outputFile) {
@@ -364,6 +416,7 @@ class CryptCLI {
                 }
             }
         } catch (error) {
+            if (progressBar) (progressBar.stop(), process.stderr.write('\n'));
             process.stderr.write(`${error}\n`);
             process.exit(1);
         }
@@ -379,13 +432,15 @@ class CryptCLI {
             const currentPassword = await this.getPassword({
                 password: options.password,
                 passwordFile: options.passwordFile,
-                passwordScript: options.passwordScript
+                passwordData: options.passwordData,
+                passwordScript: options.passwordScript,
             }, 'current password') || '';
 
             // Get new password
             const newPassword = await this.getPassword({
                 password: options.newPassword,
                 passwordFile: options.newPasswordFile,
+                passwordData: options.newPasswordData,
                 passwordScript: options.newPasswordScript,
                 skipConfirm: true
             }, 'new password') || '';
@@ -419,6 +474,7 @@ class CryptCLI {
                     newHeaderBuffer,
                     fileBuffer.slice(newHeader.size)
                 ]);
+                if (!options.force && await fs.exists(outputFile)) throw new Error('Output file already exists');
                 await fs.writeFile(outputFile, outputBuffer);
                 process.stderr.write(`New password has been applied to ${outputFile}\n`);
             } else if (inputFile !== '-') {
