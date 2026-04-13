@@ -142,7 +142,7 @@ class CryptCLI {
                     if (code === 0) {
                         if (options.r) resolve(stdout);
                         const trimmed = stdout.trim();
-                        if (trimmed !== password) process.stdout.write('Warning: Password was trimmed');
+                        if (trimmed !== stdout) process.stdout.write('Warning: Password was trimmed');
                         resolve(trimmed);
                     } else {
                         reject(new Error(`Password script failed with code ${code}`));
